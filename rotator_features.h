@@ -6,7 +6,7 @@
 
 /* main features */
 
-//#define FEATURE_ELEVATION_CONTROL       // uncomment this for AZ/EL rotators
+#define FEATURE_ELEVATION_CONTROL       // uncomment this for AZ/EL rotators
 //#define FEATURE_YAESU_EMULATION           // uncomment this for Yaesu GS-232 emulation on control port
 #define FEATURE_EASYCOM_EMULATION       // Easycom protocol emulation on control port (undefine FEATURE_YAESU_EMULATION above)
 
@@ -68,7 +68,7 @@
 //#define FEATURE_RFROBOT_I2C_DISPLAY
 //#define FEATURE_YWROBOT_I2C_DISPLAY
 
-#define FEATURE_ANALOG_OUTPUT_PINS
+//#define FEATURE_ANALOG_OUTPUT_PINS
 
 //#define FEATURE_SUN_PUSHBUTTON_AZ_EL_CALIBRATION
 //#define FEATURE_MOON_PUSHBUTTON_AZ_EL_CALIBRATION
@@ -98,8 +98,8 @@
 //#define FEATURE_PARK
 //#define OPTION_AZ_MANUAL_ROTATE_LIMITS    // this option will automatically stop the L and R commands when hitting a CCW or CW limit (settings below - AZ_MANUAL_ROTATE_*_LIMIT) 
 //#define OPTION_EL_MANUAL_ROTATE_LIMITS
-#define OPTION_EASYCOM_AZ_QUERY_COMMAND // Adds non-standard Easycom command: AZ with no parm returns current azimuth
-#define OPTION_EASYCOM_EL_QUERY_COMMAND // Adds non-standard Easycom command: EL with no parm returns current elevation
+//#define OPTION_EASYCOM_AZ_QUERY_COMMAND // Adds non-standard Easycom command: AZ with no parm returns current azimuth
+//#define OPTION_EASYCOM_EL_QUERY_COMMAND // Adds non-standard Easycom command: EL with no parm returns current elevation
 //#define OPTION_C_COMMAND_SENDS_AZ_AND_EL  // uncomment this when using Yaesu emulation with Ham Radio Deluxe
 //#define OPTION_DELAY_C_CMD_OUTPUT         // uncomment this when using Yaesu emulation with Ham Radio Deluxe
 #define FEATURE_ONE_DECIMAL_PLACE_HEADINGS
@@ -110,10 +110,10 @@
 //#define FEATURE_JOYSTICK_CONTROL          // analog joystick support
 //#define OPTION_JOYSTICK_REVERSE_X_AXIS
 //#define OPTION_JOYSTICK_REVERSE_Y_AXIS
-#define OPTION_EL_SPEED_FOLLOWS_AZ_SPEED    // changing the azimith speed with Yaesu X commands or an azimuth speed pot will also change elevation speed
+//#define OPTION_EL_SPEED_FOLLOWS_AZ_SPEED    // changing the azimith speed with Yaesu X commands or an azimuth speed pot will also change elevation speed
 //#define OPTION_PULSE_IGNORE_AMBIGUOUS_PULSES // for azimuth and elevation position pulse input feature, ignore pulses that arrive when no rotation is active
 //#define OPTION_BUTTON_RELEASE_NO_SLOWDOWN  // disables slowdown when CW or CCW button is released, or stop button is depressed
-#define OPTION_SYNC_RTC_TO_GPS // if both realtime clock and GPS are present, synchronize realtime clock to GPS
+//#define OPTION_SYNC_RTC_TO_GPS // if both realtime clock and GPS are present, synchronize realtime clock to GPS
 
 #define OPTION_DISPLAY_STATUS
 #define OPTION_DISPLAY_HEADING
@@ -151,7 +151,7 @@
 
 #define DEFAULT_DEBUG_STATE 0 // 1 = activate debug mode at startup; this should be set to zero unless you're debugging something at startup
 
-#define DEBUG_DUMP  // normally compile with this activated unless you're really trying to save memory
+//#define DEBUG_DUMP  // normally compile with this activated unless you're really trying to save memory
 // #define DEBUG_LOOP
 // #define DEBUG_MEMORY
 // #define DEBUG_BUTTONS
