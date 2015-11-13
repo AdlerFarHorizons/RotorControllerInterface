@@ -7,8 +7,8 @@
 /* main features */
 
 //#define FEATURE_ELEVATION_CONTROL       // uncomment this for AZ/EL rotators
-#define FEATURE_YAESU_EMULATION           // uncomment this for Yaesu GS-232 emulation on control port
-//#define FEATURE_EASYCOM_EMULATION       // Easycom protocol emulation on control port (undefine FEATURE_YAESU_EMULATION above)
+//#define FEATURE_YAESU_EMULATION           // uncomment this for Yaesu GS-232 emulation on control port
+#define FEATURE_EASYCOM_EMULATION       // Easycom protocol emulation on control port (undefine FEATURE_YAESU_EMULATION above)
 
 //#define FEATURE_MOON_TRACKING
 //#define FEATURE_SUN_TRACKING
@@ -47,7 +47,7 @@
 //#define FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
 //#define FEATURE_AZ_POSITION_A2_ABSOLUTE_ENCODER
 
-//#define FEATURE_EL_POSITION_POTENTIOMETER
+#define FEATURE_EL_POSITION_POTENTIOMETER
 //#define FEATURE_EL_POSITION_ROTARY_ENCODER
 //#define FEATURE_EL_POSITION_PULSE_INPUT
 //#define FEATURE_EL_POSITION_ADXL345_USING_LOVE_ELECTRON_LIB // Uncomment for elevation ADXL345 accelerometer support using ADXL345 library
@@ -61,36 +61,36 @@
 //#define FEATURE_EL_POSITION_A2_ABSOLUTE_ENCODER
 
                                     // All displays require k3ngdisplay.h and k3ngdisplay.cpp in the ino directory!
-//#define FEATURE_4_BIT_LCD_DISPLAY // Uncomment for classic 4 bit LCD display (most common)
+#define FEATURE_4_BIT_LCD_DISPLAY // Uncomment for classic 4 bit LCD display (most common)
 //#define FEATURE_ADAFRUIT_I2C_LCD
 //#define FEATURE_ADAFRUIT_BUTTONS  // Uncomment this to use Adafruit I2C LCD buttons for manual AZ/EL instead of normal buttons
 //#define FEATURE_YOURDUINO_I2C_LCD
 //#define FEATURE_RFROBOT_I2C_DISPLAY
 //#define FEATURE_YWROBOT_I2C_DISPLAY
 
-//#define FEATURE_ANALOG_OUTPUT_PINS
+#define FEATURE_ANALOG_OUTPUT_PINS
 
 //#define FEATURE_SUN_PUSHBUTTON_AZ_EL_CALIBRATION
 //#define FEATURE_MOON_PUSHBUTTON_AZ_EL_CALIBRATION
 
 /* preset rotary encoder features and options */
-#define FEATURE_AZ_PRESET_ENCODER            // Uncomment for Rotary Encoder Azimuth Preset support
-#define FEATURE_EL_PRESET_ENCODER            // Uncomment for Rotary Encoder Elevation Preset support (requires FEATURE_AZ_PRESET_ENCODER above)
-#define OPTION_ENCODER_HALF_STEP_MODE
-#define OPTION_ENCODER_ENABLE_PULLUPS          // define to enable weak pullups on rotary encoder pins
-#define OPTION_INCREMENTAL_ENCODER_PULLUPS  // define to enable weak pullups on 3 phase incremental rotary encoder pins
+//#define FEATURE_AZ_PRESET_ENCODER            // Uncomment for Rotary Encoder Azimuth Preset support
+//#define FEATURE_EL_PRESET_ENCODER            // Uncomment for Rotary Encoder Elevation Preset support (requires FEATURE_AZ_PRESET_ENCODER above)
+//#define OPTION_ENCODER_HALF_STEP_MODE
+//#define OPTION_ENCODER_ENABLE_PULLUPS          // define to enable weak pullups on rotary encoder pins
+//#define OPTION_INCREMENTAL_ENCODER_PULLUPS  // define to enable weak pullups on 3 phase incremental rotary encoder pins
 //#define OPTION_PRESET_ENCODER_RELATIVE_CHANGE   // this makes the encoder(s) change the az or el in a relative fashion rather then store an absolute setting
-#define OPTION_PRESET_ENCODER_0_360_DEGREES
+//#define OPTION_PRESET_ENCODER_0_360_DEGREES
 
 /* position sensor options */
-#define OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT // stop azimuth at lower and upper limit rather than rolling over
-#define OPTION_EL_POSITION_ROTARY_ENCODER_HARD_LIMIT // stop elevation at lower and upper limits rather than rolling over
-#define OPTION_AZ_POSITION_PULSE_HARD_LIMIT  // stop azimuth at lower and upper limit rather than rolling over
-#define OPTION_EL_POSITION_PULSE_HARD_LIMIT  // stop elevation at lower and upper limits rather than rolling over
-#define OPTION_POSITION_PULSE_INPUT_PULLUPS  // define to enable weak pullups on position pulse inputs
+//#define OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT // stop azimuth at lower and upper limit rather than rolling over
+//#define OPTION_EL_POSITION_ROTARY_ENCODER_HARD_LIMIT // stop elevation at lower and upper limits rather than rolling over
+//#define OPTION_AZ_POSITION_PULSE_HARD_LIMIT  // stop azimuth at lower and upper limit rather than rolling over
+//#define OPTION_EL_POSITION_PULSE_HARD_LIMIT  // stop elevation at lower and upper limits rather than rolling over
+//#define OPTION_POSITION_PULSE_INPUT_PULLUPS  // define to enable weak pullups on position pulse inputs
 
 /* less often used features and options */
-#define OPTION_GS_232B_EMULATION          // comment this out to default to Yaesu GS-232A emulation when using FEATURE_YAESU_EMULATION above
+//#define OPTION_GS_232B_EMULATION          // comment this out to default to Yaesu GS-232A emulation when using FEATURE_YAESU_EMULATION above
 //#define FEATURE_ROTATION_INDICATOR_PIN     // activate rotation_indication_pin to indicate rotation
 //#define FEATURE_LIMIT_SENSE
 //#define FEATURE_TIMED_BUFFER           // Support for Yaesu timed buffer commands
@@ -117,16 +117,16 @@
 
 #define OPTION_DISPLAY_STATUS
 #define OPTION_DISPLAY_HEADING
-#define OPTION_DISPLAY_HHMM_CLOCK  // display HH:MM clock  (set position with #define LCD_HHMM_CLOCK_POSITION)
+//#define OPTION_DISPLAY_HHMM_CLOCK  // display HH:MM clock  (set position with #define LCD_HHMM_CLOCK_POSITION)
 //#define OPTION_DISPLAY_HHMMSS_CLOCK  // display HH:MM:SS clock  (set position with #define LCD_HHMMSS_CLOCK_POSITION)
 //#define OPTION_DISPLAY_ALT_HHMM_CLOCK_AND_MAIDENHEAD // display alternating HH:MM clock and maidenhead on LCD row 1 (set position with #define LCD_HHMMCLOCK_POSITION)
 //#define OPTION_DISPLAY_CONSTANT_HHMMSS_CLOCK_AND_MAIDENHEAD // display constant HH:MM:SS clock and maidenhead on LCD row 1 (set position with #define LCD_CONSTANT_HHMMSSCLOCK_MAIDENHEAD_POSITION)
 //#define OPTION_DISPLAY_BIG_CLOCK   // display date & time clock (set row with #define LCD_BIG_CLOCK_ROW)
 //#define OPTION_CLOCK_ALWAYS_HAVE_HOUR_LEADING_ZERO
-#define OPTION_DISPLAY_GPS_INDICATOR  // display GPS indicator on LCD - set position with LCD_GPS_INDICATOR_POSITION and LCD_GPS_INDICATOR_ROW
-#define OPTION_DISPLAY_MOON_TRACKING_CONTINUOUSLY
+//#define OPTION_DISPLAY_GPS_INDICATOR  // display GPS indicator on LCD - set position with LCD_GPS_INDICATOR_POSITION and LCD_GPS_INDICATOR_ROW
+//#define OPTION_DISPLAY_MOON_TRACKING_CONTINUOUSLY
 //#define OPTION_DISPLAY_DIRECTION_STATUS // N, W, E, S, NW, etc. direction indicator
-#define OPTION_DISPLAY_SUN_TRACKING_CONTINUOUSLY
+//#define OPTION_DISPLAY_SUN_TRACKING_CONTINUOUSLY
 //#define OPTION_DISPLAY_MOON_OR_SUN_TRACKING_CONDITIONAL
 #define OPTION_DISPLAY_VERSION_ON_STARTUP  //code provided by Paolo, IT9IPQ
 //#define OPTION_LCD_HEADING_FIELD_FIXED_DECIMAL_PLACE
