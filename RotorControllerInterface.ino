@@ -563,6 +563,8 @@
 
 /*----------------------- variables -------------------------------------*/
 
+#define AZIMUTH_STARTING_POINT_DEFAULT 0
+
 byte incoming_serial_byte = 0;
 
 byte reset_the_unit = 0;
@@ -4278,8 +4280,8 @@ void read_azimuth(byte force_read){
   #endif
 
     #ifdef FEATURE_AZ_POSITION_POTENTIOMETER
-      analog_az = analogReadEnhanced(rotator_analog_az);
-      raw_azimuth = map(analog_az, configuration.analog_az_full_ccw, configuration.analog_az_full_cw, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
+      analog_az = constrain(analogReadEnhanced(rotator_analog_az), 0, 921);
+      raw_azimuth = map(analog_az, 0, 921, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
       //raw_azimuth = map(analog_az* HEADING_MULTIPLIER, configuration.analog_az_full_ccw* HEADING_MULTIPLIER, configuration.analog_az_full_cw* HEADING_MULTIPLIER, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
 
       #ifdef FEATURE_AZIMUTH_CORRECTION
@@ -5203,8 +5205,8 @@ void read_elevation(byte force_read){
   #endif
 
     #ifdef FEATURE_EL_POSITION_POTENTIOMETER
-    analog_el = analogReadEnhanced(rotator_analog_el);
-    elevation = (map(analog_el, configuration.analog_el_0_degrees, configuration.analog_el_max_elevation, 0, (ELEVATION_MAXIMUM_DEGREES * HEADING_MULTIPLIER)));
+    analog_el = constrain(analogReadEnhanced(rotator_analog_el), 0, 921);
+    elevation = (map(analog_el, 0, 921, 0, (ELEVATION_MAXIMUM_DEGREES * HEADING_MULTIPLIER)));
     #ifdef FEATURE_ELEVATION_CORRECTION
     elevation = (correct_elevation(elevation / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
     #endif // FEATURE_ELEVATION_CORRECTION
