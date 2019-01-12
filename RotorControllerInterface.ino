@@ -1013,9 +1013,418 @@ DebugClass debug;
   #define SEI_BUS_COMMAND_TIMEOUT_MS 6000
 #endif
 
+//-----------------------------------
+
+void read_azimuth(byte force_read){
 
 
-//yyyyyyyyy
+  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+    read_azimuth_lock = 1;
+  #endif
+
+
+  unsigned int previous_raw_azimuth = raw_azimuth;
+  static unsigned long last_measurement_time = 0;
+
+  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+    static unsigned int incremental_encoder_previous_raw_azimuth = raw_azimuth;
+  #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+
+  if (heading_reading_inhibit_pin) {
+    if (digitalReadEnhanced(heading_reading_inhibit_pin)) {
+      return;
+    }
+  }
+
+  #ifdef DEBUG_HEADING_READING_TIME
+    static unsigned long last_time = 0;
+    static unsigned long last_print_time = 0;
+    static float average_read_time = 0;
+  #endif // DEBUG_HEADING_READING_TIME
+
+  #ifdef DEBUG_HH12
+    static unsigned long last_hh12_debug = 0;
+  #endif
+
+  #ifndef FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
+    if (((millis() - last_measurement_time) > AZIMUTH_MEASUREMENT_FREQUENCY_MS) || (force_read)) {
+  #else
+    if (1) {
+  #endif
+
+    #ifdef FEATURE_AZ_POSITION_POTENTIOMETER
+      analog_az = constrain(analogReadEnhanced(rotator_analog_az), 0, 921);
+      raw_azimuth = map(analog_az, 0, 921, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
+      //raw_azimuth = map(analog_az* HEADING_MULTIPLIER, configuration.analog_az_full_ccw* HEADING_MULTIPLIER, configuration.analog_az_full_cw* HEADING_MULTIPLIER, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
+
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
+        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100.))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100.));
+      }
+      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+        if (azimuth >= (360 * HEADING_MULTIPLIER)) {
+          azimuth = azimuth - (360 * HEADING_MULTIPLIER);
+        }
+      } else {
+        if (raw_azimuth < 0) {
+          azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
+        } else {
+          azimuth = raw_azimuth;
+        }
+      }
+    #endif // FEATURE_AZ_POSITION_POTENTIOMETER
+
+    #ifdef FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
+      #if defined(FEATURE_MASTER_WITH_SERIAL_SLAVE) || defined(FEATURE_MASTER_WITH_ETHERNET_SLAVE)
+        static unsigned long last_remote_unit_az_query_time = 0;
+        // do we have a command result waiting for us?
+        if (remote_unit_command_results_available == REMOTE_UNIT_AZ_COMMAND) {
+
+          #ifdef DEBUG_HEADING_READING_TIME
+            average_read_time = (average_read_time + (millis() - last_time)) / 2.0;
+            last_time = millis();
+
+            if (debug_mode) {
+              if ((millis() - last_print_time) > 1000) {
+                debug.println("read_azimuth: avg read frequency: ");
+                debug.print(average_read_time, 2);
+                debug.println("");
+                last_print_time = millis();
+              }
+            }
+          #endif // DEBUG_HEADING_READING_TIME
+          raw_azimuth = remote_unit_command_result_float * HEADING_MULTIPLIER;
+
+
+          #ifdef FEATURE_AZIMUTH_CORRECTION
+            raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+          #endif // FEATURE_AZIMUTH_CORRECTION
+
+          raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+
+          if (AZIMUTH_SMOOTHING_FACTOR > 0) {
+            raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
+          }
+          if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+            azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+            if (azimuth >= (360 * HEADING_MULTIPLIER)) {
+              azimuth = azimuth - (360 * HEADING_MULTIPLIER);
+            }
+          } else {
+            if (raw_azimuth < 0) {
+              azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
+            } else {
+              azimuth = raw_azimuth;
+            }
+          }
+          remote_unit_command_results_available = 0;
+        } else {
+          // is it time to request the azimuth?
+          if ((millis() - last_remote_unit_az_query_time) > AZ_REMOTE_UNIT_QUERY_TIME_MS) {
+            if (submit_remote_command(REMOTE_UNIT_AZ_COMMAND, 0, 0)) {
+              last_remote_unit_az_query_time = millis();
+            }
+          }
+        }
+      #endif // defined(FEATURE_MASTER_WITH_SERIAL_SLAVE) || defined(FEATURE_MASTER_WITH_ETHERNET_SLAVE)
+    #endif // FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
+
+
+
+    #ifdef FEATURE_AZ_POSITION_ROTARY_ENCODER
+      static byte az_position_encoder_state = 0;
+      az_position_encoder_state = ttable[az_position_encoder_state & 0xf][((digitalReadEnhanced(az_rotary_position_pin2) << 1) | digitalReadEnhanced(az_rotary_position_pin1))];
+      byte az_position_encoder_result = az_position_encoder_state & 0x30;
+      if (az_position_encoder_result) {
+        if (az_position_encoder_result == DIR_CW) {
+          configuration.last_azimuth = configuration.last_azimuth + AZ_POSITION_ROTARY_ENCODER_DEG_PER_PULSE;
+          #ifdef DEBUG_POSITION_ROTARY_ENCODER
+            debug.println("read_azimuth: AZ_POSITION_ROTARY_ENCODER: CW");
+          #endif // DEBUG_POSITION_ROTARY_ENCODER
+        }
+        if (az_position_encoder_result == DIR_CCW) {
+          configuration.last_azimuth = configuration.last_azimuth - AZ_POSITION_ROTARY_ENCODER_DEG_PER_PULSE;
+          #ifdef DEBUG_POSITION_ROTARY_ENCODER
+            debug.println("read_azimuth: AZ_POSITION_ROTARY_ENCODER: CCW");
+          #endif // DEBUG_POSITION_ROTARY_ENCODER
+        }
+
+        #ifdef OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT
+          if (configuration.last_azimuth < azimuth_starting_point) {
+            configuration.last_azimuth = azimuth_starting_point;
+          }
+          if (configuration.last_azimuth > (azimuth_starting_point + azimuth_rotation_capability)) {
+            configuration.last_azimuth = (azimuth_starting_point + azimuth_rotation_capability);
+          }
+        #else
+          if (configuration.last_azimuth < 0) {
+            configuration.last_azimuth += 360;
+          }
+          if (configuration.last_azimuth >= 360) {
+            configuration.last_azimuth -= 360;
+          }
+        #endif // OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT
+
+
+        raw_azimuth = int(configuration.last_azimuth * HEADING_MULTIPLIER);
+
+
+        #ifdef FEATURE_AZIMUTH_CORRECTION
+          raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+        #endif // FEATURE_AZIMUTH_CORRECTION
+
+        if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+          azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+        } else {
+          azimuth = raw_azimuth;
+        }
+        configuration_dirty = 1;
+      }
+    #endif // FEATURE_AZ_POSITION_ROTARY_ENCODER
+
+    #ifdef FEATURE_AZ_POSITION_HMC5883L
+      MagnetometerScaled scaled = compass.ReadScaledAxis(); // scaled values from compass.
+
+      #ifdef DEBUG_HMC5883L
+        debug.print("read_azimuth: HMC5883L x:");
+        debug.print(scaled.XAxis,4);
+        debug.print(" y:");
+        debug.print(scaled.YAxis,4);
+        debug.println("");
+      #endif //DEBUG_HMC5883L
+
+
+      float heading = atan2(scaled.YAxis, scaled.XAxis);
+      //  heading += declinationAngle;
+      // Correct for when signs are reversed.
+      if (heading < 0) heading += 2 * PI;
+      if (heading > 2 * PI) heading -= 2 * PI;
+      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
+      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
+        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
+      }
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      azimuth = raw_azimuth;
+    #endif // FEATURE_AZ_POSITION_HMC5883L
+
+
+    #ifdef FEATURE_AZ_POSITION_ADAFRUIT_LSM303
+      lsm.read();
+      float heading = atan2(lsm.magData.y, lsm.magData.x);
+      //  heading += declinationAngle;
+      // Correct for when signs are reversed.
+      if (heading < 0) heading += 2 * PI;
+      if (heading > 2 * PI) heading -= 2 * PI;
+      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
+        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
+      }
+      azimuth = raw_azimuth;
+    #endif // FEATURE_AZ_POSITION_ADAFRUIT_LSM303
+
+
+    #ifdef FEATURE_AZ_POSITION_POLOLU_LSM303
+      compass.read();   
+      #ifdef DEBUG_POLOLU_LSM303_CALIBRATION
+        running_min.x = min(running_min.x, compass.m.x);
+        running_min.y = min(running_min.y, compass.m.y);
+        running_min.z = min(running_min.z, compass.m.z);
+        running_max.x = max(running_max.x, compass.m.x);
+        running_max.y = max(running_max.y, compass.m.y);
+        running_max.z = max(running_max.z, compass.m.z);
+        snprintf(report, sizeof(report), "min: {%+6d, %+6d, %+6d}    max: {%+6d, %+6d, %+6d}",
+        running_min.x, running_min.y, running_min.z,
+        running_max.x, running_max.y, running_max.z);
+        Serial.println(report);
+      #endif // DEBUG_POLOLU_LSM303_CALIBRATION
+      //lsm.read();
+          
+      /*
+      When given no arguments, the heading() function returns the angular
+      difference in the horizontal plane between a default vector and
+      north, in degrees.
+    
+      The default vector is chosen by the library to point along the
+      surface of the PCB, in the direction of the top of the text on the
+      silkscreen. This is the +X axis on the Pololu LSM303D carrier and
+      the -Y axis on the Pololu LSM303DLHC, LSM303DLM, and LSM303DLH
+      carriers.
+      
+      To use a different vector as a reference, use the version of heading()
+      that takes a vector argument; for example, use
+    
+      compass.heading((LSM303::vector<int>){0, 0, 1});
+    
+      to use the +Z axis as a reference.
+      */
+      float heading = compass.heading();
+      
+      //float heading = atan2(lsm.magData.y, lsm.magData.x);
+      //  heading += declinationAngle; 
+      // Correct for when signs are reversed.
+      /*
+      if (heading < 0) heading += 2 * PI;
+      if (heading > 2 * PI) heading -= 2 * PI;
+      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
+      */
+      raw_azimuth = heading * HEADING_MULTIPLIER ;  // pololu library returns float value of actual heading.
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
+        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
+      }
+      azimuth = raw_azimuth;
+    #endif // FEATURE_AZ_POSITION_POLOLU_LSM303
+
+
+
+    #ifdef FEATURE_AZ_POSITION_PULSE_INPUT
+      #ifdef DEBUG_POSITION_PULSE_INPUT
+  //    if (az_position_pule_interrupt_handler_flag) {
+  //      control_port->print(F("read_azimuth: az_position_pusle_interrupt_handler_flag: "));
+  //      control_port->println(az_position_pule_interrupt_handler_flag);
+  //      az_position_pule_interrupt_handler_flag = 0;
+  //    }
+      #endif // DEBUG_POSITION_PULSE_INPUT
+      static float last_az_position_pulse_input_azimuth = az_position_pulse_input_azimuth;
+      if (az_position_pulse_input_azimuth != last_az_position_pulse_input_azimuth) {
+        #ifdef DEBUG_POSITION_PULSE_INPUT
+  //        if (debug_mode){
+  //          control_port->print(F("read_azimuth: last_az_position_pulse_input_azimuth:"));
+  //          control_port->print(last_az_position_pulse_input_azimuth);
+  //          control_port->print(F(" az_position_pulse_input_azimuth:"));
+  //          control_port->print(az_position_pulse_input_azimuth);
+  //          control_port->print(F(" az_pulse_counter:"));
+  //          control_port->println(az_pulse_counter);
+  //        }
+        #endif // DEBUG_POSITION_PULSE_INPUT
+        configuration.last_azimuth = az_position_pulse_input_azimuth;
+        configuration_dirty = 1;
+        last_az_position_pulse_input_azimuth = az_position_pulse_input_azimuth;
+        raw_azimuth = int(configuration.last_azimuth * HEADING_MULTIPLIER);
+        #ifdef FEATURE_AZIMUTH_CORRECTION
+          raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+        #endif // FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+        if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+          azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+        } else {
+          azimuth = raw_azimuth;
+        }
+      }
+    #endif // FEATURE_AZ_POSITION_PULSE_INPUT
+
+    #ifdef FEATURE_AZ_POSITION_HH12_AS5045_SSI
+      raw_azimuth = int(azimuth_hh12.heading() * HEADING_MULTIPLIER);
+      #ifdef DEBUG_HH12
+        if ((millis() - last_hh12_debug) > 5000) {
+          debug.print(F("read_azimuth: HH-12 raw: "));
+          control_port->println(raw_azimuth);
+          last_hh12_debug = millis();
+        }
+      #endif // DEBUG_HH12
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+      } else {
+        if (raw_azimuth < 0) {
+          azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
+        } else {
+          azimuth = raw_azimuth;
+        }
+      }
+    #endif // FEATURE_AZ_POSITION_HH12_AS5045_SSI
+/*
+    #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+      if (AZIMUTH_STARTING_POINT_DEFAULT == 0) {
+        raw_azimuth = (((((az_incremental_encoder_position) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
+      } else {
+        if (az_incremental_encoder_position > ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) {
+          raw_azimuth = (((((az_incremental_encoder_position - ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
+        } else {
+          raw_azimuth = (((((az_incremental_encoder_position + ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
+        }
+      }
+
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+      } else {
+        azimuth = raw_azimuth;
+      }
+      if (raw_azimuth != incremental_encoder_previous_raw_azimuth) {
+        configuration.last_az_incremental_encoder_position = az_incremental_encoder_position;
+        configuration_dirty = 1;
+        incremental_encoder_previous_raw_azimuth = raw_azimuth;
+      }
+    #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+*/
+
+    #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+      if (AZIMUTH_STARTING_POINT_DEFAULT == 0) {
+        raw_azimuth = (((((az_incremental_encoder_position) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
+      } else {
+        if (az_incremental_encoder_position > (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) {
+          raw_azimuth = (((((az_incremental_encoder_position - (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
+        } else {
+          raw_azimuth = (((((az_incremental_encoder_position + (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
+        }
+      }
+      #ifdef FEATURE_AZIMUTH_CORRECTION
+        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+      #endif // FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
+        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
+      } else {
+        azimuth = raw_azimuth;
+      }
+      if (raw_azimuth != incremental_encoder_previous_raw_azimuth) {
+        configuration.last_az_incremental_encoder_position = az_incremental_encoder_position;
+        configuration_dirty = 1;
+        incremental_encoder_previous_raw_azimuth = raw_azimuth;
+      }
+    #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER      
+
+    last_measurement_time = millis();
+  }
+
+
+  #ifdef FEATURE_AZ_POSITION_A2_ABSOLUTE_ENCODER
+    raw_azimuth = az_a2_encoder * HEADING_MULTIPLIER;
+    #ifdef FEATURE_AZIMUTH_CORRECTION
+      raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
+    #endif // FEATURE_AZIMUTH_CORRECTION
+    raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
+    azimuth = raw_azimuth;
+  #endif //FEATURE_AZ_POSITION_A2_ABSOLUTE_ENCODER  
+
+  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
+    read_azimuth_lock = 0;
+  #endif
+
+
+} /* read_azimuth */
+
 
 #include "rotator_clock_and_gps.h"
 #include "rotator_command_processing.h" 
@@ -4238,420 +4647,6 @@ void check_timed_interval(){
   #endif
 } /* check_timed_interval */
 #endif // FEATURE_TIMED_BUFFER
-
-
-// --------------------------------------------------------------
-
-void read_azimuth(byte force_read){
-
-
-  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-    read_azimuth_lock = 1;
-  #endif
-
-
-  unsigned int previous_raw_azimuth = raw_azimuth;
-  static unsigned long last_measurement_time = 0;
-
-  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-    static unsigned int incremental_encoder_previous_raw_azimuth = raw_azimuth;
-  #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-
-  if (heading_reading_inhibit_pin) {
-    if (digitalReadEnhanced(heading_reading_inhibit_pin)) {
-      return;
-    }
-  }
-
-  #ifdef DEBUG_HEADING_READING_TIME
-    static unsigned long last_time = 0;
-    static unsigned long last_print_time = 0;
-    static float average_read_time = 0;
-  #endif // DEBUG_HEADING_READING_TIME
-
-  #ifdef DEBUG_HH12
-    static unsigned long last_hh12_debug = 0;
-  #endif
-
-  #ifndef FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
-    if (((millis() - last_measurement_time) > AZIMUTH_MEASUREMENT_FREQUENCY_MS) || (force_read)) {
-  #else
-    if (1) {
-  #endif
-
-    #ifdef FEATURE_AZ_POSITION_POTENTIOMETER
-      analog_az = constrain(analogReadEnhanced(rotator_analog_az), 0, 921);
-      raw_azimuth = map(analog_az, 0, 921, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
-      //raw_azimuth = map(analog_az* HEADING_MULTIPLIER, configuration.analog_az_full_ccw* HEADING_MULTIPLIER, configuration.analog_az_full_cw* HEADING_MULTIPLIER, (azimuth_starting_point * HEADING_MULTIPLIER), ((azimuth_starting_point + azimuth_rotation_capability) * HEADING_MULTIPLIER));
-
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
-        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100.))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100.));
-      }
-      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-        if (azimuth >= (360 * HEADING_MULTIPLIER)) {
-          azimuth = azimuth - (360 * HEADING_MULTIPLIER);
-        }
-      } else {
-        if (raw_azimuth < 0) {
-          azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
-        } else {
-          azimuth = raw_azimuth;
-        }
-      }
-    #endif // FEATURE_AZ_POSITION_POTENTIOMETER
-
-    #ifdef FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
-      #if defined(FEATURE_MASTER_WITH_SERIAL_SLAVE) || defined(FEATURE_MASTER_WITH_ETHERNET_SLAVE)
-        static unsigned long last_remote_unit_az_query_time = 0;
-        // do we have a command result waiting for us?
-        if (remote_unit_command_results_available == REMOTE_UNIT_AZ_COMMAND) {
-
-          #ifdef DEBUG_HEADING_READING_TIME
-            average_read_time = (average_read_time + (millis() - last_time)) / 2.0;
-            last_time = millis();
-
-            if (debug_mode) {
-              if ((millis() - last_print_time) > 1000) {
-                debug.println("read_azimuth: avg read frequency: ");
-                debug.print(average_read_time, 2);
-                debug.println("");
-                last_print_time = millis();
-              }
-            }
-          #endif // DEBUG_HEADING_READING_TIME
-          raw_azimuth = remote_unit_command_result_float * HEADING_MULTIPLIER;
-
-
-          #ifdef FEATURE_AZIMUTH_CORRECTION
-            raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-          #endif // FEATURE_AZIMUTH_CORRECTION
-
-          raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-
-          if (AZIMUTH_SMOOTHING_FACTOR > 0) {
-            raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
-          }
-          if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-            azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-            if (azimuth >= (360 * HEADING_MULTIPLIER)) {
-              azimuth = azimuth - (360 * HEADING_MULTIPLIER);
-            }
-          } else {
-            if (raw_azimuth < 0) {
-              azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
-            } else {
-              azimuth = raw_azimuth;
-            }
-          }
-          remote_unit_command_results_available = 0;
-        } else {
-          // is it time to request the azimuth?
-          if ((millis() - last_remote_unit_az_query_time) > AZ_REMOTE_UNIT_QUERY_TIME_MS) {
-            if (submit_remote_command(REMOTE_UNIT_AZ_COMMAND, 0, 0)) {
-              last_remote_unit_az_query_time = millis();
-            }
-          }
-        }
-      #endif // defined(FEATURE_MASTER_WITH_SERIAL_SLAVE) || defined(FEATURE_MASTER_WITH_ETHERNET_SLAVE)
-    #endif // FEATURE_AZ_POSITION_GET_FROM_REMOTE_UNIT
-
-
-
-    #ifdef FEATURE_AZ_POSITION_ROTARY_ENCODER
-      static byte az_position_encoder_state = 0;
-      az_position_encoder_state = ttable[az_position_encoder_state & 0xf][((digitalReadEnhanced(az_rotary_position_pin2) << 1) | digitalReadEnhanced(az_rotary_position_pin1))];
-      byte az_position_encoder_result = az_position_encoder_state & 0x30;
-      if (az_position_encoder_result) {
-        if (az_position_encoder_result == DIR_CW) {
-          configuration.last_azimuth = configuration.last_azimuth + AZ_POSITION_ROTARY_ENCODER_DEG_PER_PULSE;
-          #ifdef DEBUG_POSITION_ROTARY_ENCODER
-            debug.println("read_azimuth: AZ_POSITION_ROTARY_ENCODER: CW");
-          #endif // DEBUG_POSITION_ROTARY_ENCODER
-        }
-        if (az_position_encoder_result == DIR_CCW) {
-          configuration.last_azimuth = configuration.last_azimuth - AZ_POSITION_ROTARY_ENCODER_DEG_PER_PULSE;
-          #ifdef DEBUG_POSITION_ROTARY_ENCODER
-            debug.println("read_azimuth: AZ_POSITION_ROTARY_ENCODER: CCW");
-          #endif // DEBUG_POSITION_ROTARY_ENCODER
-        }
-
-        #ifdef OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT
-          if (configuration.last_azimuth < azimuth_starting_point) {
-            configuration.last_azimuth = azimuth_starting_point;
-          }
-          if (configuration.last_azimuth > (azimuth_starting_point + azimuth_rotation_capability)) {
-            configuration.last_azimuth = (azimuth_starting_point + azimuth_rotation_capability);
-          }
-        #else
-          if (configuration.last_azimuth < 0) {
-            configuration.last_azimuth += 360;
-          }
-          if (configuration.last_azimuth >= 360) {
-            configuration.last_azimuth -= 360;
-          }
-        #endif // OPTION_AZ_POSITION_ROTARY_ENCODER_HARD_LIMIT
-
-
-        raw_azimuth = int(configuration.last_azimuth * HEADING_MULTIPLIER);
-
-
-        #ifdef FEATURE_AZIMUTH_CORRECTION
-          raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-        #endif // FEATURE_AZIMUTH_CORRECTION
-
-        if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-          azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-        } else {
-          azimuth = raw_azimuth;
-        }
-        configuration_dirty = 1;
-      }
-    #endif // FEATURE_AZ_POSITION_ROTARY_ENCODER
-
-    #ifdef FEATURE_AZ_POSITION_HMC5883L
-      MagnetometerScaled scaled = compass.ReadScaledAxis(); // scaled values from compass.
-
-      #ifdef DEBUG_HMC5883L
-        debug.print("read_azimuth: HMC5883L x:");
-        debug.print(scaled.XAxis,4);
-        debug.print(" y:");
-        debug.print(scaled.YAxis,4);
-        debug.println("");
-      #endif //DEBUG_HMC5883L
-
-
-      float heading = atan2(scaled.YAxis, scaled.XAxis);
-      //  heading += declinationAngle;
-      // Correct for when signs are reversed.
-      if (heading < 0) heading += 2 * PI;
-      if (heading > 2 * PI) heading -= 2 * PI;
-      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
-      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
-        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
-      }
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      azimuth = raw_azimuth;
-    #endif // FEATURE_AZ_POSITION_HMC5883L
-
-
-    #ifdef FEATURE_AZ_POSITION_ADAFRUIT_LSM303
-      lsm.read();
-      float heading = atan2(lsm.magData.y, lsm.magData.x);
-      //  heading += declinationAngle;
-      // Correct for when signs are reversed.
-      if (heading < 0) heading += 2 * PI;
-      if (heading > 2 * PI) heading -= 2 * PI;
-      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
-        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
-      }
-      azimuth = raw_azimuth;
-    #endif // FEATURE_AZ_POSITION_ADAFRUIT_LSM303
-
-
-    #ifdef FEATURE_AZ_POSITION_POLOLU_LSM303
-      compass.read();   
-      #ifdef DEBUG_POLOLU_LSM303_CALIBRATION
-        running_min.x = min(running_min.x, compass.m.x);
-        running_min.y = min(running_min.y, compass.m.y);
-        running_min.z = min(running_min.z, compass.m.z);
-        running_max.x = max(running_max.x, compass.m.x);
-        running_max.y = max(running_max.y, compass.m.y);
-        running_max.z = max(running_max.z, compass.m.z);
-        snprintf(report, sizeof(report), "min: {%+6d, %+6d, %+6d}    max: {%+6d, %+6d, %+6d}",
-        running_min.x, running_min.y, running_min.z,
-        running_max.x, running_max.y, running_max.z);
-        Serial.println(report);
-      #endif // DEBUG_POLOLU_LSM303_CALIBRATION
-      //lsm.read();
-          
-      /*
-      When given no arguments, the heading() function returns the angular
-      difference in the horizontal plane between a default vector and
-      north, in degrees.
-    
-      The default vector is chosen by the library to point along the
-      surface of the PCB, in the direction of the top of the text on the
-      silkscreen. This is the +X axis on the Pololu LSM303D carrier and
-      the -Y axis on the Pololu LSM303DLHC, LSM303DLM, and LSM303DLH
-      carriers.
-      
-      To use a different vector as a reference, use the version of heading()
-      that takes a vector argument; for example, use
-    
-      compass.heading((LSM303::vector<int>){0, 0, 1});
-    
-      to use the +Z axis as a reference.
-      */
-      float heading = compass.heading();
-      
-      //float heading = atan2(lsm.magData.y, lsm.magData.x);
-      //  heading += declinationAngle; 
-      // Correct for when signs are reversed.
-      /*
-      if (heading < 0) heading += 2 * PI;
-      if (heading > 2 * PI) heading -= 2 * PI;
-      raw_azimuth = (heading * RAD_TO_DEG) * HEADING_MULTIPLIER; // radians to degree
-      */
-      raw_azimuth = heading * HEADING_MULTIPLIER ;  // pololu library returns float value of actual heading.
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (AZIMUTH_SMOOTHING_FACTOR > 0) {
-        raw_azimuth = (raw_azimuth * (1 - (AZIMUTH_SMOOTHING_FACTOR / 100))) + (previous_raw_azimuth * (AZIMUTH_SMOOTHING_FACTOR / 100));
-      }
-      azimuth = raw_azimuth;
-    #endif // FEATURE_AZ_POSITION_POLOLU_LSM303
-
-
-
-    #ifdef FEATURE_AZ_POSITION_PULSE_INPUT
-      #ifdef DEBUG_POSITION_PULSE_INPUT
-  //    if (az_position_pule_interrupt_handler_flag) {
-  //      control_port->print(F("read_azimuth: az_position_pusle_interrupt_handler_flag: "));
-  //      control_port->println(az_position_pule_interrupt_handler_flag);
-  //      az_position_pule_interrupt_handler_flag = 0;
-  //    }
-      #endif // DEBUG_POSITION_PULSE_INPUT
-      static float last_az_position_pulse_input_azimuth = az_position_pulse_input_azimuth;
-      if (az_position_pulse_input_azimuth != last_az_position_pulse_input_azimuth) {
-        #ifdef DEBUG_POSITION_PULSE_INPUT
-  //        if (debug_mode){
-  //          control_port->print(F("read_azimuth: last_az_position_pulse_input_azimuth:"));
-  //          control_port->print(last_az_position_pulse_input_azimuth);
-  //          control_port->print(F(" az_position_pulse_input_azimuth:"));
-  //          control_port->print(az_position_pulse_input_azimuth);
-  //          control_port->print(F(" az_pulse_counter:"));
-  //          control_port->println(az_pulse_counter);
-  //        }
-        #endif // DEBUG_POSITION_PULSE_INPUT
-        configuration.last_azimuth = az_position_pulse_input_azimuth;
-        configuration_dirty = 1;
-        last_az_position_pulse_input_azimuth = az_position_pulse_input_azimuth;
-        raw_azimuth = int(configuration.last_azimuth * HEADING_MULTIPLIER);
-        #ifdef FEATURE_AZIMUTH_CORRECTION
-          raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-        #endif // FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-        if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-          azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-        } else {
-          azimuth = raw_azimuth;
-        }
-      }
-    #endif // FEATURE_AZ_POSITION_PULSE_INPUT
-
-    #ifdef FEATURE_AZ_POSITION_HH12_AS5045_SSI
-      raw_azimuth = int(azimuth_hh12.heading() * HEADING_MULTIPLIER);
-      #ifdef DEBUG_HH12
-        if ((millis() - last_hh12_debug) > 5000) {
-          debug.print(F("read_azimuth: HH-12 raw: "));
-          control_port->println(raw_azimuth);
-          last_hh12_debug = millis();
-        }
-      #endif // DEBUG_HH12
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-      } else {
-        if (raw_azimuth < 0) {
-          azimuth = raw_azimuth + (360 * HEADING_MULTIPLIER);
-        } else {
-          azimuth = raw_azimuth;
-        }
-      }
-    #endif // FEATURE_AZ_POSITION_HH12_AS5045_SSI
-/*
-    #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-      if (AZIMUTH_STARTING_POINT_DEFAULT == 0) {
-        raw_azimuth = (((((az_incremental_encoder_position) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
-      } else {
-        if (az_incremental_encoder_position > ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) {
-          raw_azimuth = (((((az_incremental_encoder_position - ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
-        } else {
-          raw_azimuth = (((((az_incremental_encoder_position + ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) / ((long)AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4L)) * 360L)) * (long)HEADING_MULTIPLIER);
-        }
-      }
-
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-      } else {
-        azimuth = raw_azimuth;
-      }
-      if (raw_azimuth != incremental_encoder_previous_raw_azimuth) {
-        configuration.last_az_incremental_encoder_position = az_incremental_encoder_position;
-        configuration_dirty = 1;
-        incremental_encoder_previous_raw_azimuth = raw_azimuth;
-      }
-    #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-*/
-
-    #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-      if (AZIMUTH_STARTING_POINT_DEFAULT == 0) {
-        raw_azimuth = (((((az_incremental_encoder_position) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
-      } else {
-        if (az_incremental_encoder_position > (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) {
-          raw_azimuth = (((((az_incremental_encoder_position - (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
-        } else {
-          raw_azimuth = (((((az_incremental_encoder_position + (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) / (AZ_POSITION_INCREMENTAL_ENCODER_PULSES_PER_REV*4.)) * 360.0)) * HEADING_MULTIPLIER);
-        }
-      }
-      #ifdef FEATURE_AZIMUTH_CORRECTION
-        raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-      #endif // FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-      if (raw_azimuth >= (360 * HEADING_MULTIPLIER)) {
-        azimuth = raw_azimuth - (360 * HEADING_MULTIPLIER);
-      } else {
-        azimuth = raw_azimuth;
-      }
-      if (raw_azimuth != incremental_encoder_previous_raw_azimuth) {
-        configuration.last_az_incremental_encoder_position = az_incremental_encoder_position;
-        configuration_dirty = 1;
-        incremental_encoder_previous_raw_azimuth = raw_azimuth;
-      }
-    #endif // FEATURE_AZ_POSITION_INCREMENTAL_ENCODER      
-
-    last_measurement_time = millis();
-  }
-
-
-  #ifdef FEATURE_AZ_POSITION_A2_ABSOLUTE_ENCODER
-    raw_azimuth = az_a2_encoder * HEADING_MULTIPLIER;
-    #ifdef FEATURE_AZIMUTH_CORRECTION
-      raw_azimuth = (correct_azimuth(raw_azimuth / (float) HEADING_MULTIPLIER) * HEADING_MULTIPLIER);
-    #endif // FEATURE_AZIMUTH_CORRECTION
-    raw_azimuth = raw_azimuth + (configuration.azimuth_offset * HEADING_MULTIPLIER);
-    azimuth = raw_azimuth;
-  #endif //FEATURE_AZ_POSITION_A2_ABSOLUTE_ENCODER  
-
-  #ifdef FEATURE_AZ_POSITION_INCREMENTAL_ENCODER
-    read_azimuth_lock = 0;
-  #endif
-
-
-
-} /* read_azimuth */
 
 // --------------------------------------------------------------
 
